@@ -157,6 +157,10 @@ void mixColumns(unsigned char* state) {
                               mul_3[state[15]]);
   mixed[15] = (unsigned char)(mul_3[state[12]] ^ state[13] ^ state[14] ^
                               mul_2[state[15]]);
+
+  for (int i = 0; i < 16; i++) {
+    state[i] = mixed[i];
+  }
 }
 
 void encrypt(unsigned char* state, unsigned char* keys,
@@ -178,7 +182,8 @@ void encrypt(unsigned char* state, unsigned char* keys,
 int main() {
   unsigned int numRounds = 10;  // number of encryption rounds
   unsigned char plaintext[] = "This is a message we will encrypt with AES!";
-  unsigned char key[16] = {1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16};
+  unsigned char key[16] = {1, 2,  3,  4,  5,  6,  7,  8,
+                           9, 10, 11, 12, 13, 14, 15, 16};
 
   // expand keys
   unsigned char expandedKeys[(numRounds + 1) * 16];
