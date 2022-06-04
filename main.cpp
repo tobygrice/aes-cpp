@@ -1,8 +1,68 @@
 #include <iostream>
 
+// declare external lookup tables
 extern int sbox_f[256];
+extern int sbox_r[256];
+extern int rcon[256];
+extern int mul_2[256];
+extern int mul_3[256];
+extern int mul_9[256];
+extern int mul_11[256];
+extern int mul_13[256];
+extern int mul_14[256];
 
-void keyExpansion() {}
+void keyExpansionCore(unsigned char* in, unsigned char i) {
+  // rotate bytes left
+  unsigned char t = in[0];
+  in[0] = in[1];
+  in[1] = in[2];
+  in[2] = in[3];
+  in[3] = t;
+
+  // sub bytes from sbox
+  in[0] = sbox_f[in[0]];
+  in[1] = sbox_f[in[1]];
+  in[2] = sbox_f[in[2]];
+  in[3] = sbox_f[in[3]];
+
+  // RCon
+  in[0] ^= rcon[i];
+}
+
+void keyExpansion(unsigned char* key, unsigned char* expandedKeys,
+                  unsigned int numRounds) {
+  // the first 16 bytes are the original key
+  for (int i = 0; i < 16; i++) {
+    expandedKeys[i] = key[i];
+  }
+
+  int bytesGenerated = 16;  // 16 bytes of expandedKeys has now been generated
+  int rconIteration = 1;    // 1 iteration has been completed
+
+  // initialise temporary array for keyExpansionCore
+  unsigned char temp[4];
+
+  while (bytesGenerated < ((numRounds + 1) * 16)) {
+    // store the previous 4 bytes of expandedKeys in temp array
+    for (int i = 0; i < 4; i++) {
+      temp[i] = expandedKeys[i + bytesGenerated - 4];
+    }
+
+    // perform key expansion core only on the first four bytes of each new key
+    if (bytesGenerated % 16 == 0) {
+      keyExpansionCore(temp, rconIteration);
+      rconIteration++;
+    }
+
+    // store the newly generated 4 bytes
+    for (int i = 0; i < 4; i++) {
+      // xor each byte with the byte 16 positions behind
+      temp[i] ^= expandedKeys[bytesGenerated - 16];
+      expandedKeys[bytesGenerated] = temp[i];
+      bytesGenerated++;
+    }
+  }
+}
 
 void addRoundKey(unsigned char* state, unsigned char* roundKey) {
   // for each element of the state
@@ -54,37 +114,88 @@ void shiftRows(unsigned char* state) {
   }
 }
 
-void mixColumns() {}
+void mixColumns(unsigned char* state) {
+  // initialise array to store mixed values
+  unsigned char mixed[16];
 
-void encrypt(unsigned char* state, unsigned char* key) {
-  int numRounds = 10;
+  // mix first column
+  mixed[0] =
+      (unsigned char)(mul_2[state[0]] ^ mul_3[state[1]] ^ state[2] ^ state[3]);
+  mixed[1] =
+      (unsigned char)(state[0] ^ mul_2[state[1]] ^ mul_3[state[2]] ^ state[3]);
+  mixed[2] =
+      (unsigned char)(state[0] ^ state[1] ^ mul_2[state[2]] ^ mul_3[state[3]]);
+  mixed[3] =
+      (unsigned char)(mul_3[state[0]] ^ state[1] ^ state[2] ^ mul_2[state[3]]);
 
-  keyExpansion();
-  addRoundKey(state, key);
+  // mix second column
+  mixed[4] =
+      (unsigned char)(mul_2[state[4]] ^ mul_3[state[5]] ^ state[6] ^ state[7]);
+  mixed[5] =
+      (unsigned char)(state[4] ^ mul_2[state[5]] ^ mul_3[state[6]] ^ state[7]);
+  mixed[6] =
+      (unsigned char)(state[4] ^ state[5] ^ mul_2[state[6]] ^ mul_3[state[7]]);
+  mixed[7] =
+      (unsigned char)(mul_3[state[4]] ^ state[5] ^ state[6] ^ mul_2[state[7]]);
 
-  for (int i = 0; i < numRounds; i++) {
+  // mix third column
+  mixed[8] = (unsigned char)(mul_2[state[8]] ^ mul_3[state[9]] ^ state[10] ^
+                             state[11]);
+  mixed[9] = (unsigned char)(state[8] ^ mul_2[state[9]] ^ mul_3[state[10]] ^
+                             state[11]);
+  mixed[10] = (unsigned char)(state[8] ^ state[9] ^ mul_2[state[10]] ^
+                              mul_3[state[11]]);
+  mixed[11] = (unsigned char)(mul_3[state[8]] ^ state[9] ^ state[10] ^
+                              mul_2[state[11]]);
+
+  // mix fourth column
+  mixed[12] = (unsigned char)(mul_2[state[12]] ^ mul_3[state[13]] ^ state[14] ^
+                              state[15]);
+  mixed[13] = (unsigned char)(state[12] ^ mul_2[state[13]] ^ mul_3[state[14]] ^
+                              state[15]);
+  mixed[14] = (unsigned char)(state[12] ^ state[13] ^ mul_2[state[14]] ^
+                              mul_3[state[15]]);
+  mixed[15] = (unsigned char)(mul_3[state[12]] ^ state[13] ^ state[14] ^
+                              mul_2[state[15]]);
+}
+
+void encrypt(unsigned char* state, unsigned char* keys,
+             unsigned int numRounds) {
+  addRoundKey(state, keys);
+
+  for (int i = 0; i < numRounds - 1; i++) {
     subBytes(state);
     shiftRows(state);
-    mixColumns();
-    addRoundKey(state, key);
+    mixColumns(state);
+    addRoundKey(state, &keys[16 * (i + 1)]);
   }
 
   subBytes(state);
   shiftRows(state);
-  addRoundKey(state, key);
+  addRoundKey(state, &keys[16 * numRounds]);
 }
 
 int main() {
-  char* plaintext = "This is a message we will encrypt with AES!";
-  unsigned char key[16] = {1, 2,  3,  4,  5,  6,  7,  8,
-                           9, 10, 11, 12, 13, 14, 15, 16};
+  unsigned int numRounds = 10;  // number of encryption rounds
+  unsigned char plaintext[] = "This is a message we will encrypt with AES!";
+  unsigned char key[16] = {1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16};
+
+  // expand keys
+  unsigned char expandedKeys[(numRounds + 1) * 16];
+  keyExpansion(key, expandedKeys, numRounds);
 
   unsigned char state[16];
   for (int i = 0; i < 16; i++) {
     state[i] = plaintext[i];
   }
 
-  encrypt(state, key);
+  encrypt(state, expandedKeys, numRounds);
+
+  for (int i = 0; i < 16; i++) {
+    std::cout << std::hex << +state[i] << std::endl;
+  }
 
   return 0;
 }
+
+// expandedKeys[bytesGenerated] = expandedKeys[bytesGenerated - 16] ^ temp[i];
