@@ -1,20 +1,13 @@
-#include <iostream>
-
 // declare external lookup tables
-extern int sbox_f[256];
 extern int sbox_r[256];
-extern int rcon[256];
-extern int mul_2[256];
-extern int mul_3[256];
 extern int mul_9[256];
 extern int mul_11[256];
 extern int mul_13[256];
 extern int mul_14[256];
 
-extern void keyExpansionCore(unsigned char*, unsigned char);
-extern void keyExpansion(const unsigned char*, unsigned char*);
 extern void addRoundKey(unsigned char*, unsigned char*);
 
+// Inverse process of subBytes function. Uses the reverse sbox.
 void subBytes_inv(unsigned char* state) {
   // for each element of the state
   for (int i = 0; i < 16; i++) {
@@ -23,6 +16,7 @@ void subBytes_inv(unsigned char* state) {
   }
 }
 
+// Inverse process of shiftRows function
 void shiftRows_inv(unsigned char* state) {
   // initialise array to store shifted values
   unsigned char shifted[16];
@@ -57,10 +51,12 @@ void shiftRows_inv(unsigned char* state) {
   }
 }
 
+// Inverse process of mixColumns function
 void mixColumns_inv(unsigned char* state) {
   // initialise array to store mixed values
   unsigned char mixed[16];
 
+  // mix first column
   mixed[0] = (unsigned char)(mul_14[state[0]] ^ mul_11[state[1]] ^
                              mul_13[state[2]] ^ mul_9[state[3]]);
   mixed[1] = (unsigned char)(mul_9[state[0]] ^ mul_14[state[1]] ^
@@ -70,6 +66,7 @@ void mixColumns_inv(unsigned char* state) {
   mixed[3] = (unsigned char)(mul_11[state[0]] ^ mul_13[state[1]] ^
                              mul_9[state[2]] ^ mul_14[state[3]]);
 
+  // mix second column
   mixed[4] = (unsigned char)(mul_14[state[4]] ^ mul_11[state[5]] ^
                              mul_13[state[6]] ^ mul_9[state[7]]);
   mixed[5] = (unsigned char)(mul_9[state[4]] ^ mul_14[state[5]] ^
@@ -79,6 +76,7 @@ void mixColumns_inv(unsigned char* state) {
   mixed[7] = (unsigned char)(mul_11[state[4]] ^ mul_13[state[5]] ^
                              mul_9[state[6]] ^ mul_14[state[7]]);
 
+  // mix third column
   mixed[8] = (unsigned char)(mul_14[state[8]] ^ mul_11[state[9]] ^
                              mul_13[state[10]] ^ mul_9[state[11]]);
   mixed[9] = (unsigned char)(mul_9[state[8]] ^ mul_14[state[9]] ^
@@ -88,6 +86,7 @@ void mixColumns_inv(unsigned char* state) {
   mixed[11] = (unsigned char)(mul_11[state[8]] ^ mul_13[state[9]] ^
                               mul_9[state[10]] ^ mul_14[state[11]]);
 
+  // mix fourth column
   mixed[12] = (unsigned char)(mul_14[state[12]] ^ mul_11[state[13]] ^
                               mul_13[state[14]] ^ mul_9[state[15]]);
   mixed[13] = (unsigned char)(mul_9[state[12]] ^ mul_14[state[13]] ^
@@ -102,7 +101,8 @@ void mixColumns_inv(unsigned char* state) {
   }
 }
 
-void decryptCore(unsigned char* state, unsigned char* keys) {
+// Decrypts 16-byte input using the Rijndael algorithm with provided keys.
+void decrypt(unsigned char state[16], unsigned char keys[176]) {
   // addRoundKey(state, keys); ?
   addRoundKey(state, &keys[160]);
 
@@ -116,38 +116,4 @@ void decryptCore(unsigned char* state, unsigned char* keys) {
   shiftRows_inv(state);
   subBytes_inv(state);
   addRoundKey(state, keys);
-}
-
-unsigned char* decrypt(const unsigned char* plaintext,
-                       const unsigned char* key) {
-  // expand keys
-  unsigned char expandedKeys[176];
-  keyExpansion(key, expandedKeys);
-
-  // calculate size of plaintext after padding
-  unsigned int lengthPlaintext = strlen((const char*)plaintext);
-  unsigned int lengthPadded;
-  if (lengthPlaintext % 16 != 0) {
-    // round up to the nearest multiple of 16 and store in lengthPadded
-    lengthPadded = (lengthPlaintext / 16 + 1) * 16;
-  } else {
-    lengthPadded = lengthPlaintext;
-  }
-
-  // initialise ciphertext with plaintext, padded with 0s to reach a multiple of
-  // 16 bytes
-  unsigned char* ciphertext = new unsigned char[lengthPadded];
-  for (int i = 0; i < lengthPadded; i++) {
-    if (i >= lengthPlaintext)
-      ciphertext[i] = 0;
-    else
-      ciphertext[i] = plaintext[i];
-  }
-
-  // perform encryptCore on ciphertext 16 bytes at a time
-  for (int i = 0; i < lengthPadded; i += 16) {
-    decryptCore(&ciphertext[i], expandedKeys);
-  }
-
-  return ciphertext;
 }

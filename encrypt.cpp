@@ -1,76 +1,11 @@
-#include <iostream>
-
 // declare external lookup tables
 extern int sbox_f[256];
-extern int sbox_r[256];
-extern int rcon[256];
 extern int mul_2[256];
 extern int mul_3[256];
-extern int mul_9[256];
-extern int mul_11[256];
-extern int mul_13[256];
-extern int mul_14[256];
 
-void keyExpansionCore(unsigned char* in, unsigned char i) {
-  // rotate bytes left
-  unsigned char t = in[0];
-  in[0] = in[1];
-  in[1] = in[2];
-  in[2] = in[3];
-  in[3] = t;
+extern void addRoundKey(unsigned char*, unsigned char*);
 
-  // sub bytes from sbox
-  in[0] = sbox_f[in[0]];
-  in[1] = sbox_f[in[1]];
-  in[2] = sbox_f[in[2]];
-  in[3] = sbox_f[in[3]];
-
-  // RCon
-  in[0] ^= rcon[i];
-}
-
-void keyExpansion(const unsigned char* key, unsigned char* expandedKeys) {
-  // the first 16 bytes are the original key
-  for (int i = 0; i < 16; i++) {
-    expandedKeys[i] = key[i];
-  }
-
-  int bytesGenerated = 16;  // 16 bytes of expandedKeys has now been generated
-  int rconIteration = 1;    // 1 iteration has been completed
-
-  // initialise temporary array for keyExpansionCore
-  unsigned char temp[4];
-
-  while (bytesGenerated < 176) {
-    // store the previous 4 bytes of expandedKeys in temp array
-    for (int i = 0; i < 4; i++) {
-      temp[i] = expandedKeys[i + bytesGenerated - 4];
-    }
-
-    // perform key expansion core only on the first four bytes of each new key
-    if (bytesGenerated % 16 == 0) {
-      keyExpansionCore(temp, rconIteration);
-      rconIteration++;
-    }
-
-    // store the newly generated 4 bytes
-    for (int i = 0; i < 4; i++) {
-      // xor each byte with the byte 16 positions behind
-      temp[i] ^= expandedKeys[bytesGenerated - 16];
-      expandedKeys[bytesGenerated] = temp[i];
-      bytesGenerated++;
-    }
-  }
-}
-
-void addRoundKey(unsigned char* state, unsigned char* roundKey) {
-  // for each element of the state
-  for (int i = 0; i < 16; i++) {
-    // xor state with roundkey
-    state[i] ^= roundKey[i];
-  }
-}
-
+// Substitutes each element of the state with its corresponding sbox value.
 void subBytes(unsigned char* state) {
   // for each element of the state
   for (int i = 0; i < 16; i++) {
@@ -79,6 +14,7 @@ void subBytes(unsigned char* state) {
   }
 }
 
+// Shift each row of the state according to the Rijndael encryption method.
 void shiftRows(unsigned char* state) {
   // initialise array to store shifted values
   unsigned char shifted[16];
@@ -113,6 +49,7 @@ void shiftRows(unsigned char* state) {
   }
 }
 
+// Mix each column of the state according to the Rijndael encryption method.
 void mixColumns(unsigned char* state) {
   // initialise array to store mixed values
   unsigned char mixed[16];
@@ -162,7 +99,8 @@ void mixColumns(unsigned char* state) {
   }
 }
 
-void encryptCore(unsigned char* state, unsigned char* keys) {
+// Encrypts 16-byte input using the Rijndael algorithm with provided keys.
+void encrypt(unsigned char state[16], unsigned char keys[176]) {
   addRoundKey(state, keys);
 
   for (int i = 0; i < 9; i++) {
@@ -175,38 +113,4 @@ void encryptCore(unsigned char* state, unsigned char* keys) {
   subBytes(state);
   shiftRows(state);
   addRoundKey(state, &keys[160]);
-}
-
-unsigned char* encrypt(const unsigned char* plaintext,
-                       const unsigned char* key) {
-  // expand keys
-  unsigned char expandedKeys[176];
-  keyExpansion(key, expandedKeys);
-
-  // calculate size of plaintext after padding
-  unsigned int lengthPlaintext = strlen((const char*)plaintext);
-  unsigned int lengthPadded;
-  if (lengthPlaintext % 16 != 0) {
-    // round up to the nearest multiple of 16 and store in lengthPadded
-    lengthPadded = (lengthPlaintext / 16 + 1) * 16;
-  } else {
-    lengthPadded = lengthPlaintext;
-  }
-
-  // initialise ciphertext with plaintext, padded with 0s to reach a multiple of
-  // 16 bytes
-  unsigned char* ciphertext = new unsigned char[lengthPadded];
-  for (int i = 0; i < lengthPadded; i++) {
-    if (i >= lengthPlaintext)
-      ciphertext[i] = 0;
-    else
-      ciphertext[i] = plaintext[i];
-  }
-
-  // perform encryptCore on ciphertext 16 bytes at a time
-  for (int i = 0; i < lengthPadded; i += 16) {
-    encryptCore(&ciphertext[i], expandedKeys);
-  }
-
-  return ciphertext;
 }
