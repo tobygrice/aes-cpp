@@ -3,8 +3,9 @@
 #include "aes.h"
 
 // clang++ main.cpp source/aes.cpp source/encrypt.cpp source/decrypt.cpp
-// source/lookup.cpp extern unsigned char* aes(const unsigned char*, const
-// unsigned char*, bool);
+// source/lookup.cpp 
+
+// extern unsigned char* aes(const unsigned char*, const unsigned char*, bool);
 
 int main() {
   const unsigned char plaintext[] =
