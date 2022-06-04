@@ -1,0 +1,1 @@
+Implementation of AES in C++. Heavy inspiration from creator Creel (https://www.youtube.com/c/WhatsACreel) on YouTube, with tweaks to structure and memory to improve performance and readability.

@@ -1,8 +1,8 @@
 #include <iostream>
 
-// #include "aes.h"
+#include "aes.h"
 
-extern unsigned char* aes(const unsigned char*, const unsigned char*, bool);
+// extern unsigned char* aes(const unsigned char*, const unsigned char*, bool);
 
 int main() {
   const unsigned char plaintext[] =
