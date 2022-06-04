@@ -29,8 +29,7 @@ void keyExpansionCore(unsigned char* in, unsigned char i) {
   in[0] ^= rcon[i];
 }
 
-void keyExpansion(unsigned char* key, unsigned char* expandedKeys,
-                  unsigned int numRounds) {
+void keyExpansion(const unsigned char* key, unsigned char* expandedKeys) {
   // the first 16 bytes are the original key
   for (int i = 0; i < 16; i++) {
     expandedKeys[i] = key[i];
@@ -42,7 +41,7 @@ void keyExpansion(unsigned char* key, unsigned char* expandedKeys,
   // initialise temporary array for keyExpansionCore
   unsigned char temp[4];
 
-  while (bytesGenerated < ((numRounds + 1) * 16)) {
+  while (bytesGenerated < 176) {
     // store the previous 4 bytes of expandedKeys in temp array
     for (int i = 0; i < 4; i++) {
       temp[i] = expandedKeys[i + bytesGenerated - 4];
@@ -163,11 +162,10 @@ void mixColumns(unsigned char* state) {
   }
 }
 
-void encrypt(unsigned char* state, unsigned char* keys,
-             unsigned int numRounds) {
+void encryptCore(unsigned char* state, unsigned char* keys) {
   addRoundKey(state, keys);
 
-  for (int i = 0; i < numRounds - 1; i++) {
+  for (int i = 0; i < 9; i++) {
     subBytes(state);
     shiftRows(state);
     mixColumns(state);
@@ -176,31 +174,60 @@ void encrypt(unsigned char* state, unsigned char* keys,
 
   subBytes(state);
   shiftRows(state);
-  addRoundKey(state, &keys[16 * numRounds]);
+  addRoundKey(state, &keys[160]);
+}
+
+unsigned char* encrypt(const unsigned char* plaintext,
+                       const unsigned char* key) {
+  // expand keys
+  unsigned char expandedKeys[176];
+  keyExpansion(key, expandedKeys);
+
+  // calculate size of plaintext after padding
+  unsigned int lengthPlaintext = strlen((const char*)plaintext);
+  unsigned int lengthPadded;
+  if (lengthPlaintext % 16 != 0) {
+    // round up to the nearest multiple of 16 and store in lengthPadded
+    lengthPadded = (lengthPlaintext / 16 + 1) * 16;
+  } else {
+    lengthPadded = lengthPlaintext;
+  }
+
+  // initialise ciphertext with plaintext, padded with 0s to reach a multiple of
+  // 16 bytes
+  unsigned char* ciphertext = new unsigned char[lengthPadded];
+  for (int i = 0; i < lengthPadded; i++) {
+    if (i >= lengthPlaintext)
+      ciphertext[i] = 0;
+    else
+      ciphertext[i] = plaintext[i];
+  }
+
+  // perform encryptCore on ciphertext 16 bytes at a time
+  for (int i = 0; i < lengthPadded; i += 16) {
+    encryptCore(&ciphertext[i], expandedKeys);
+  }
+
+  return ciphertext;
 }
 
 int main() {
-  unsigned int numRounds = 10;  // number of encryption rounds
-  unsigned char plaintext[] = "This is a message we will encrypt with AES!";
-  unsigned char key[16] = {1, 2,  3,  4,  5,  6,  7,  8,
-                           9, 10, 11, 12, 13, 14, 15, 16};
+  const unsigned char plaintext[] =
+      "This is a message we will encrypt with AES!";
 
-  // expand keys
-  unsigned char expandedKeys[(numRounds + 1) * 16];
-  keyExpansion(key, expandedKeys, numRounds);
+  const unsigned char key[16] = {0x9b, 0xe0, 0x91, 0x1b, 0xfc, 0x4b,
+                                 0x03, 0x2c, 0xdc, 0xb5, 0xa0, 0xed,
+                                 0x4c, 0x0d, 0xbf, 0xf7};
 
-  unsigned char state[16];
-  for (int i = 0; i < 16; i++) {
-    state[i] = plaintext[i];
+  unsigned char* ciphertext = encrypt(plaintext, key);
+
+  // print the ciphertext array, adding a newline every 16 bytes
+  for (int i = 0; i < strlen((const char*)ciphertext); i++) {
+    std::cout << std::hex << +ciphertext[i] << " ";
+    if ((i + 1) % 16 == 0) std::cout << std::endl;
   }
 
-  encrypt(state, expandedKeys, numRounds);
-
-  for (int i = 0; i < 16; i++) {
-    std::cout << std::hex << +state[i] << std::endl;
-  }
+  delete[] ciphertext;
 
   return 0;
 }
-
-// expandedKeys[bytesGenerated] = expandedKeys[bytesGenerated - 16] ^ temp[i];
