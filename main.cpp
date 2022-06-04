@@ -1,6 +1,8 @@
 #include <iostream>
 
 extern unsigned char* encrypt(const unsigned char*, const unsigned char*);
+extern unsigned char* decrypt(const unsigned char*, const unsigned char*);
+
 
 int main() {
   const unsigned char plaintext[] =
@@ -16,6 +18,13 @@ int main() {
   for (int i = 0; i < strlen((const char*)ciphertext); i++) {
     std::cout << std::hex << +ciphertext[i] << " ";
     if ((i + 1) % 16 == 0) std::cout << std::endl;
+  }
+
+  std::cout << std::endl;
+
+  ciphertext = decrypt(ciphertext, key);
+  for (int i = 0; i < strlen((const char*)ciphertext); i++) {
+    std::cout << ciphertext[i];
   }
 
   delete[] ciphertext;
